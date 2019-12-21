@@ -1,112 +1,150 @@
 <?php
 
-function intcode_getParameter(&$memory, $position, $mode = 0) {
-	if ($mode == 0) {
-		return $memory[$position];
-	} else if ($mode == 1) {
-		return $position;
+class intcodeEngine {
+	public $memory;
+	public $position;
+	public $outputs;
+	public $inputs;
+	public $pendingInputs;
+
+	function __construct($input) {
+		$this->memory = explode(",", $input);
+		$this->position = 0;
+		$this->outputs = array();
+		$this->inputs = array(
+			"position" => 0,
+			"data" => array(),
+		);
+		$this->pendingInputs = array();
 	}
-}
 
-function intcode_opcode_01(&$memory, $position, $modes) {
-	$input1 = $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	$input2 = $memory[intcode_getParameter($memory, $position+2, $modes[1])];
-	$memory[intcode_getParameter($memory, $position+3, $modes[2])] = $input1 + $input2;
-	return 4;
-}
-
-function intcode_opcode_02(&$memory, $position, $modes) {
-	$input1 = $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	$input2 = $memory[intcode_getParameter($memory, $position+2, $modes[1])];
-	$memory[intcode_getParameter($memory, $position+3, $modes[2])] = $input1 * $input2;
-	return 4;
-}
-
-function intcode_opcode_03(&$memory, $position, $modes) {
-	$memory[intcode_getParameter($memory, $position+1, $modes[0])] = $memory['inputs']['data'][$memory['inputs']['position']];
-	$memory['inputs']['position']++;
-	return 2;
-}
-
-function intcode_opcode_04(&$memory, $position, $modes) {
-	echo $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	return 2;
-}
-
-function intcode_opcode_05(&$memory, $position, $modes) {
-	$param1 = $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	$param2 = $memory[intcode_getParameter($memory, $position+2, $modes[1])];
-	if ($param1 != 0) {
-		return $param2 - $position;
+	function provideInput($input) {
+		$this->inputs['data'][] = $input;
 	}
-	return 3;
-}
 
-function intcode_opcode_06(&$memory, $position, $modes) {
-	$param1 = $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	$param2 = $memory[intcode_getParameter($memory, $position+2, $modes[1])];
-	if ($param1 == 0) {
-		return $param2 - $position;
+	function getParameter($position, $mode = 0) {
+		if ($mode == 0) {
+			return $this->memory[$position];
+		} else if ($mode == 1) {
+			return $position;
+		}
 	}
-	return 3;
-}
 
-function intcode_opcode_07(&$memory, $position, $modes) {
-	$param1 = $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	$param2 = $memory[intcode_getParameter($memory, $position+2, $modes[1])];
-	$output = 0;
-	if ($param1 < $param2) {
-		$output = 1;
+	function opcode_01($modes) {
+		$input1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$input2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $input1 + $input2;
+		return 4;
 	}
-	$memory[intcode_getParameter($memory, $position+3, $modes[2])] = $output;
-	return 4;
-}
 
-function intcode_opcode_08(&$memory, $position, $modes) {
-	$param1 = $memory[intcode_getParameter($memory, $position+1, $modes[0])];
-	$param2 = $memory[intcode_getParameter($memory, $position+2, $modes[1])];
-	$output = 0;
-	if ($param1 == $param2) {
-		$output = 1;
+	function opcode_02($modes) {
+		$input1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$input2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $input1 * $input2;
+		return 4;
 	}
-	$memory[intcode_getParameter($memory, $position+3, $modes[2])] = $output;
-	return 4;
-}
 
-function intcode_opcode_99(&$memory, $position, $modes) {
-	return count($memory) + 1;
-}
-
-function intcode_parse_opcode($opcode) {
-	$return = array(
-		"opcode" => "01",
-		"modes" => array(
-			0 => 0,
-			1 => 0,
-			2 => 0,
-		),
-	);
-	$code = strrev($opcode);
-	$return['opcode'] = strrev(substr($code, 0, 2));
-	if (strlen($return['opcode']) == 1) {
-		$return['opcode'] = "0".$return['opcode'];
-	} 
-	$code = substr($code, 2);
-	$pos = 0;
-	while (strlen($code) > 0) {
-		$return['modes'][$pos] = substr($code, 0, 1);
-		$pos++;
-		$code = substr($code, 1);
+	function opcode_03($modes) {
+		if (!isset($this->inputs['data'][$this->inputs['position']])) {
+			return false;
+		}
+		$this->memory[$this->getParameter($this->position+1, $modes[0])] = $this->inputs['data'][$this->inputs['position']];
+		$this->inputs['position']++;
+		return 2;
 	}
-	return $return;
-}
 
-function intcode_process_opcode(&$memory, $position) {
-	$operation = intcode_parse_opcode($memory[$position]);
-	if (function_exists("intcode_opcode_".$operation['opcode'])) {
-		return call_user_func_array("intcode_opcode_".$operation['opcode'], array(&$memory, $position, $operation['modes']));
-	} else {
-		echo "Unknown opcode intcode_opcode_".$operation['opcode']." at position ".$position."\n";
-		die();
+	function opcode_04($modes) {
+		$this->outputs[] = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		return 2;
+	}
+
+	function opcode_05($modes) {
+		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		if ($param1 != 0) {
+			return $param2 - $this->position;
+		}
+		return 3;
+	}
+
+	function opcode_06($modes) {
+		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		if ($param1 == 0) {
+			return $param2 - $this->position;
+		}
+		return 3;
+	}
+
+	function opcode_07($modes) {
+		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$output = 0;
+		if ($param1 < $param2) {
+			$output = 1;
+		}
+		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $output;
+		return 4;
+	}
+
+	function opcode_08($modes) {
+		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$output = 0;
+		if ($param1 == $param2) {
+			$output = 1;
+		}
+		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $output;
+		return 4;
+	}
+
+	function opcode_99($modes) {
+		return count($this->memory) + 1;
+	}
+
+	function parse_opcode($opcode) {
+		$return = array(
+			"opcode" => "01",
+			"modes" => array(
+				0 => 0,
+				1 => 0,
+				2 => 0,
+			),
+		);
+		$code = strrev($opcode);
+		$return['opcode'] = strrev(substr($code, 0, 2));
+		if (strlen($return['opcode']) == 1) {
+			$return['opcode'] = "0".$return['opcode'];
+		} 
+		$code = substr($code, 2);
+		$pos = 0;
+		while (strlen($code) > 0) {
+			$return['modes'][$pos] = substr($code, 0, 1);
+			$pos++;
+			$code = substr($code, 1);
+		}
+		return $return;
+	}
+
+	function process_opcode() {
+		$operation = $this->parse_opcode($this->memory[$this->position]);
+		if (method_exists($this, "opcode_".$operation['opcode'])) {
+			return $this->{"opcode_".$operation['opcode']}($operation['modes']);
+		} else {
+			echo "Unknown opcode opcode_".$operation['opcode']." at position ".$this->position."\n";
+			die();
+		}
+	}
+
+	function run() {
+		$increment = $this->process_opcode();
+		if ($increment) {
+			$this->position += $increment;
+			if ($this->position > count($this->memory)) {
+				return 0;
+			}
+			return $this->run();
+		}
+		return 1;
 	}
 }

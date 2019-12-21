@@ -14,6 +14,13 @@ function runPuzzlePart($puzzle, $part) {
 		return;
 	}
 	echo "Puzzle ".$puzzle." (".$part."): ";
-	echo call_user_func("puzzle".$puzzle."_part".$part);
+	$response = call_user_func("puzzle".$puzzle."_part".$part);
+	if (is_array($response)) {
+		print_r($response);
+	} else {
+		echo $response;
+	}
 	echo "\n";
 }
+
+include_once('intcode.php');
