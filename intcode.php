@@ -5,7 +5,7 @@ class intcodeEngine {
 	public $position;
 	public $outputs;
 	public $inputs;
-	public $pendingInputs;
+	public $relativeBase;
 
 	function __construct($input) {
 		$this->memory = explode(",", $input);
@@ -15,7 +15,7 @@ class intcodeEngine {
 			"position" => 0,
 			"data" => array(),
 		);
-		$this->pendingInputs = array();
+		$this->relativeBase = 0;
 	}
 
 	function provideInput($input) {
@@ -27,19 +27,29 @@ class intcodeEngine {
 			return $this->memory[$position];
 		} else if ($mode == 1) {
 			return $position;
+		} else if ($mode == 2) {
+			$ref = $this->memory[$position] + $this->relativeBase;
+			return $ref;
 		}
 	}
 
+	function getFromMemory($position, $mode = 0) {
+		if (!isset($this->memory[$this->getParameter($position, $mode)])) {
+			return 0;
+		}
+		return $this->memory[$this->getParameter($position, $mode)];
+	}
+
 	function opcode_01($modes) {
-		$input1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
-		$input2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$input1 = $this->getFromMemory($this->position+1, $modes[0]);
+		$input2 = $this->getFromMemory($this->position+2, $modes[1]);
 		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $input1 + $input2;
 		return 4;
 	}
 
 	function opcode_02($modes) {
-		$input1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
-		$input2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$input1 = $this->getFromMemory($this->position+1, $modes[0]);
+		$input2 = $this->getFromMemory($this->position+2, $modes[1]);
 		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $input1 * $input2;
 		return 4;
 	}
@@ -54,13 +64,13 @@ class intcodeEngine {
 	}
 
 	function opcode_04($modes) {
-		$this->outputs[] = $this->memory[$this->getParameter($this->position+1, $modes[0])];
+		$this->outputs[] = $this->getFromMemory($this->position+1, $modes[0]);
 		return 2;
 	}
 
 	function opcode_05($modes) {
-		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
-		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$param1 = $this->getFromMemory($this->position+1, $modes[0]);
+		$param2 = $this->getFromMemory($this->position+2, $modes[1]);
 		if ($param1 != 0) {
 			return $param2 - $this->position;
 		}
@@ -68,8 +78,8 @@ class intcodeEngine {
 	}
 
 	function opcode_06($modes) {
-		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
-		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$param1 = $this->getFromMemory($this->position+1, $modes[0]);
+		$param2 = $this->getFromMemory($this->position+2, $modes[1]);
 		if ($param1 == 0) {
 			return $param2 - $this->position;
 		}
@@ -77,8 +87,8 @@ class intcodeEngine {
 	}
 
 	function opcode_07($modes) {
-		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
-		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$param1 = $this->getFromMemory($this->position+1, $modes[0]);
+		$param2 = $this->getFromMemory($this->position+2, $modes[1]);
 		$output = 0;
 		if ($param1 < $param2) {
 			$output = 1;
@@ -88,14 +98,19 @@ class intcodeEngine {
 	}
 
 	function opcode_08($modes) {
-		$param1 = $this->memory[$this->getParameter($this->position+1, $modes[0])];
-		$param2 = $this->memory[$this->getParameter($this->position+2, $modes[1])];
+		$param1 = $this->getFromMemory($this->position+1, $modes[0]);
+		$param2 = $this->getFromMemory($this->position+2, $modes[1]);
 		$output = 0;
 		if ($param1 == $param2) {
 			$output = 1;
 		}
 		$this->memory[$this->getParameter($this->position+3, $modes[2])] = $output;
 		return 4;
+	}
+
+	function opcode_09($modes) {
+		$this->relativeBase = $this->getFromMemory($this->position+1, $modes[0]) + $this->relativeBase;
+		return 2;
 	}
 
 	function opcode_99($modes) {

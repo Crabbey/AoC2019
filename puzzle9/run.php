@@ -2,4 +2,4 @@
 
 include("puzzle.php");
 
-runPuzzle(6);
+runPuzzle(9);
